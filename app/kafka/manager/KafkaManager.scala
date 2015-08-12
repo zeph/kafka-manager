@@ -171,19 +171,19 @@ class KafkaManager(akkaConfig: Config)
   }
 
   //--------------------Commands--------------------------
-  def addCluster(clusterName: String, version: String, zkHosts: String, jmxEnabled: Boolean): Future[ApiError \/
+  def addCluster(clusterName: String, version: String, zkHosts: String, jmxEnabled: Boolean, jmxUser: String, jmxPass: String): Future[ApiError \/
     Unit] =
   {
-    val cc = ClusterConfig(clusterName, version, zkHosts, jmxEnabled = jmxEnabled)
+    val cc = ClusterConfig(clusterName, version, zkHosts, jmxEnabled = jmxEnabled, jmxUser = jmxUser, jmxPass = jmxPass)
     tryWithKafkaManagerActor(KMAddCluster(cc)) { result: KMCommandResult =>
       result.result.get
     }
   }
 
-  def updateCluster(clusterName: String, version: String, zkHosts: String, jmxEnabled: Boolean): Future[ApiError \/
+  def updateCluster(clusterName: String, version: String, zkHosts: String, jmxEnabled: Boolean, jmxUser: String, jmxPass: String): Future[ApiError \/
     Unit] =
   {
-    val cc = ClusterConfig(clusterName, version, zkHosts, jmxEnabled = jmxEnabled)
+    val cc = ClusterConfig(clusterName, version, zkHosts, jmxEnabled = jmxEnabled, jmxUser = jmxUser, jmxPass = jmxPass)
     tryWithKafkaManagerActor(KMUpdateCluster(cc)) { result: KMCommandResult =>
       result.result.get
     }

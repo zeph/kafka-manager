@@ -35,6 +35,24 @@ object Cluster extends Controller {
     }
   }
 
+  val validateJmxUser : Constraint[String] = Constraint("validate jmxUser") { jmxUser =>
+    Try {
+      ClusterConfig.validateJmxUser(jmxUser)
+    } match {
+      case Failure(t) => Invalid(t.getMessage)
+      case Success(_) => Valid
+    }
+  }
+
+  val validateJmxPass : Constraint[String] = Constraint("validate jmxPass") { jmxPass =>
+    Try {
+      ClusterConfig.validateJmxPass(jmxPass)
+    } match {
+      case Failure(t) => Invalid(t.getMessage)
+      case Success(_) => Valid
+    }
+  }
+
   val validateZkHosts : Constraint[String] = Constraint("validate zookeeper hosts") { zkHosts =>
     Try {
       ClusterConfig.validateZkHosts(zkHosts)
@@ -67,7 +85,9 @@ object Cluster extends Controller {
       "kafkaVersion" -> nonEmptyText.verifying(validateKafkaVersion),
       "zkHosts" -> nonEmptyText.verifying(validateZkHosts),
       "zkMaxRetry" -> ignored(100 : Int),
-      "jmxEnabled" -> boolean
+      "jmxEnabled" -> boolean,
+      "jmxUser" -> nonEmptyText.verifying(maxLength(32), validateName),
+      "jmxPass" -> nonEmptyText.verifying(maxLength(32), validateName)
     )(ClusterConfig.apply)(ClusterConfig.customUnapply)
   )
 
@@ -78,7 +98,9 @@ object Cluster extends Controller {
       "kafkaVersion" -> nonEmptyText.verifying(validateKafkaVersion),
       "zkHosts" -> nonEmptyText.verifying(validateZkHosts),
       "zkMaxRetry" -> ignored(100 : Int),
-      "jmxEnabled" -> boolean
+      "jmxEnabled" -> boolean,
+      "jmxUser" -> nonEmptyText.verifying(maxLength(32), validateName),
+      "jmxPass" -> nonEmptyText.verifying(maxLength(32), validateName)
     )(ClusterOperation.apply)(ClusterOperation.customUnapply)
   )
 
@@ -89,7 +111,7 @@ object Cluster extends Controller {
   def updateCluster(c: String) = Action.async { implicit request =>
     kafkaManager.getClusterConfig(c).map { errorOrClusterConfig =>
       Ok(views.html.cluster.updateCluster(c,errorOrClusterConfig.map { cc =>
-        updateForm.fill(ClusterOperation.apply(Update.toString,cc.name,cc.version.toString,cc.curatorConfig.zkConnect,cc.curatorConfig.zkMaxRetry,cc.jmxEnabled))
+        updateForm.fill(ClusterOperation.apply(Update.toString,cc.name,cc.version.toString,cc.curatorConfig.zkConnect,cc.curatorConfig.zkMaxRetry,cc.jmxEnabled, cc.jmxUser, cc.jmxPass))
       }))
     }
   }
@@ -98,7 +120,7 @@ object Cluster extends Controller {
     clusterConfigForm.bindFromRequest.fold(
       formWithErrors => Future.successful(BadRequest(views.html.cluster.addCluster(formWithErrors))),
       clusterConfig => {
-        kafkaManager.addCluster(clusterConfig.name, clusterConfig.version.toString, clusterConfig.curatorConfig.zkConnect, clusterConfig.jmxEnabled).map { errorOrSuccess =>
+        kafkaManager.addCluster(clusterConfig.name, clusterConfig.version.toString, clusterConfig.curatorConfig.zkConnect, clusterConfig.jmxEnabled, clusterConfig.jmxUser, clusterConfig.jmxPass).map { errorOrSuccess =>
           Ok(views.html.common.resultOfCommand(
             views.html.navigation.defaultMenu(),
             models.navigation.BreadCrumbs.withView("Add Cluster"),
@@ -154,7 +176,9 @@ object Cluster extends Controller {
             clusterOperation.clusterConfig.name,
             clusterOperation.clusterConfig.version.toString,
             clusterOperation.clusterConfig.curatorConfig.zkConnect,
-            clusterOperation.clusterConfig.jmxEnabled
+            clusterOperation.clusterConfig.jmxEnabled, 
+            clusterOperation.clusterConfig.jmxUser,
+            clusterOperation.clusterConfig.jmxPass
           ).map { errorOrSuccess =>
             Ok(views.html.common.resultOfCommand(
               views.html.navigation.defaultMenu(),

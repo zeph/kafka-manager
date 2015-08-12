@@ -77,22 +77,28 @@ object ClusterConfig {
     }
   }
 
+  def validateJmxUser(jmxUser: String) { }
+  def validateJmxPass(jmxPass: String) { }
+
   def validateZkHosts(zkHosts: String): Unit = {
     require(zkHosts.length > 0, "cluster zk hosts is illegal, can't be empty!")
   }
 
-  def apply(name: String, version : String, zkHosts: String, zkMaxRetry: Int = 100, jmxEnabled: Boolean) : ClusterConfig = {
+  def apply(name: String, version : String, zkHosts: String, zkMaxRetry: Int = 100, jmxEnabled: Boolean, jmxUser: String, jmxPass: String) : ClusterConfig = {
     val kafkaVersion = KafkaVersion(version)
     //validate cluster name
     validateName(name)
     //validate zk hosts
     validateZkHosts(zkHosts)
+    //validate and convert type
+    validateJmxUser(jmxUser)
+    validateJmxPass(jmxPass)
     val cleanZkHosts = zkHosts.replaceAll(" ","")
-    new ClusterConfig(name, CuratorConfig(cleanZkHosts, zkMaxRetry), true, kafkaVersion, jmxEnabled)
+    new ClusterConfig(name, CuratorConfig(cleanZkHosts, zkMaxRetry), true, kafkaVersion, jmxEnabled, jmxUser, jmxPass)
   }
 
-  def customUnapply(cc: ClusterConfig) : Option[(String, String, String, Int, Boolean)] = {
-    Some((cc.name, cc.version.toString, cc.curatorConfig.zkConnect, cc.curatorConfig.zkMaxRetry, cc.jmxEnabled))
+  def customUnapply(cc: ClusterConfig) : Option[(String, String, String, Int, Boolean, String, String)] = {
+    Some((cc.name, cc.version.toString, cc.curatorConfig.zkConnect, cc.curatorConfig.zkMaxRetry, cc.jmxEnabled, cc.jmxUser.toString, cc.jmxPass))
   }
 
   import scalaz.{Failure,Success}
@@ -123,6 +129,8 @@ object ClusterConfig {
       :: ("enabled" -> toJSON(config.enabled))
       :: ("kafkaVersion" -> toJSON(config.version.toString))
       :: ("jmxEnabled" -> toJSON(config.jmxEnabled))
+      :: ("jmxUser" -> toJSON(config.jmxUser.toString))
+      :: ("jmxPass" -> toJSON(config.jmxPass.toString))
       :: Nil)
     compact(render(json)).getBytes(StandardCharsets.UTF_8)
   }
@@ -131,13 +139,15 @@ object ClusterConfig {
     Try {
       val json = parse(kafka.manager.utils.deserializeString(ba))
 
-      val result = (field[String]("name")(json) |@| field[CuratorConfig]("curatorConfig")(json) |@| field[Boolean]("enabled")(json))
+      val result = (field[String]("name")(json) |@| field[CuratorConfig]("curatorConfig")(json) |@| field[Boolean]("enabled")(json) |@| field[String]("jmxUser")(json) |@| field[String]("jmxPass")(json))
       {
         (name:String,curatorConfig:CuratorConfig,enabled:Boolean) =>
           val versionString = field[String]("kafkaVersion")(json)
           val version = versionString.map(KafkaVersion.apply).getOrElse(Kafka_0_8_1_1)
           val jmxEnabled = field[Boolean]("jmxEnabled")(json)
-          ClusterConfig.apply(name,curatorConfig,enabled,version,jmxEnabled.getOrElse(false))
+          val jmxUser = field[String]("jmxUser")(json)
+          val jmxPass = field[String]("jmxPass")(json)
+          ClusterConfig.apply(name,curatorConfig,enabled,version,jmxEnabled.getOrElse(false), jmxUser, jmxPass)
       }
 
       result match {
@@ -152,7 +162,7 @@ object ClusterConfig {
 
 }
 
-case class ClusterConfig (name: String, curatorConfig : CuratorConfig, enabled: Boolean, version: KafkaVersion, jmxEnabled: Boolean)
+case class ClusterConfig (name: String, curatorConfig : CuratorConfig, enabled: Boolean, version: KafkaVersion, jmxEnabled: Boolean, jmxUser: String, jmxPass: String)
 
 object KafkaManagerActor {
   val ZkRoot : String = "/kafka-manager"
@@ -544,7 +554,9 @@ class KafkaManagerActor(kafkaManagerConfig: KafkaManagerActorConfig)
       if(newConfig.curatorConfig.zkConnect == currentConfig.curatorConfig.zkConnect
         && newConfig.enabled == currentConfig.enabled
         && newConfig.version == currentConfig.version
-        && newConfig.jmxEnabled == currentConfig.jmxEnabled) {
+        && newConfig.jmxEnabled == currentConfig.jmxEnabled
+        && newConfig.jmxUser == currentConfig.jmxUser
+        && newConfig.jmxPass == currentConfig.jmxPass) {
         //nothing changed
         false
       } else {
