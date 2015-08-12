@@ -98,7 +98,7 @@ object ClusterConfig {
   }
 
   def customUnapply(cc: ClusterConfig) : Option[(String, String, String, Int, Boolean, String, String)] = {
-    Some((cc.name, cc.version.toString, cc.curatorConfig.zkConnect, cc.curatorConfig.zkMaxRetry, cc.jmxEnabled, cc.jmxUser.toString, cc.jmxPass))
+    Some((cc.name, cc.version.toString, cc.curatorConfig.zkConnect, cc.curatorConfig.zkMaxRetry, cc.jmxEnabled, cc.jmxUser, cc.jmxPass))
   }
 
   import scalaz.{Failure,Success}
@@ -129,8 +129,8 @@ object ClusterConfig {
       :: ("enabled" -> toJSON(config.enabled))
       :: ("kafkaVersion" -> toJSON(config.version.toString))
       :: ("jmxEnabled" -> toJSON(config.jmxEnabled))
-      :: ("jmxUser" -> toJSON(config.jmxUser.toString))
-      :: ("jmxPass" -> toJSON(config.jmxPass.toString))
+      :: ("jmxUser" -> toJSON(config.jmxUser))
+      :: ("jmxPass" -> toJSON(config.jmxPass))
       :: Nil)
     compact(render(json)).getBytes(StandardCharsets.UTF_8)
   }
@@ -141,12 +141,10 @@ object ClusterConfig {
 
       val result = (field[String]("name")(json) |@| field[CuratorConfig]("curatorConfig")(json) |@| field[Boolean]("enabled")(json) |@| field[String]("jmxUser")(json) |@| field[String]("jmxPass")(json))
       {
-        (name:String,curatorConfig:CuratorConfig,enabled:Boolean) =>
+        (name:String,curatorConfig:CuratorConfig,enabled:Boolean,jmxUser:String,jmxPass:String) =>
           val versionString = field[String]("kafkaVersion")(json)
           val version = versionString.map(KafkaVersion.apply).getOrElse(Kafka_0_8_1_1)
           val jmxEnabled = field[Boolean]("jmxEnabled")(json)
-          val jmxUser = field[String]("jmxUser")(json)
-          val jmxPass = field[String]("jmxPass")(json)
           ClusterConfig.apply(name,curatorConfig,enabled,version,jmxEnabled.getOrElse(false), jmxUser, jmxPass)
       }
 

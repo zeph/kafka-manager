@@ -99,8 +99,8 @@ object Cluster extends Controller {
       "zkHosts" -> nonEmptyText.verifying(validateZkHosts),
       "zkMaxRetry" -> ignored(100 : Int),
       "jmxEnabled" -> boolean,
-      "jmxUser" -> nonEmptyText.verifying(maxLength(32), validateName),
-      "jmxPass" -> nonEmptyText.verifying(maxLength(32), validateName)
+      "jmxUser" -> nonEmptyText.verifying(maxLength(32), validateJmxUser),
+      "jmxPass" -> nonEmptyText.verifying(maxLength(32), validateJmxPass)
     )(ClusterOperation.apply)(ClusterOperation.customUnapply)
   )
 
