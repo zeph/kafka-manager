@@ -84,7 +84,7 @@ object ClusterConfig {
     require(zkHosts.length > 0, "cluster zk hosts is illegal, can't be empty!")
   }
 
-  def apply(name: String, version : String, zkHosts: String, zkMaxRetry: Int = 100, jmxEnabled: Boolean, jmxUser: String, jmxPass: String) : ClusterConfig = {
+  def apply(name: String, version : String, zkHosts: String, zkMaxRetry: Int = 100, jmxEnabled: Boolean, jmxUser: String = "", jmxPass: String = "") : ClusterConfig = {
     val kafkaVersion = KafkaVersion(version)
     //validate cluster name
     validateName(name)
