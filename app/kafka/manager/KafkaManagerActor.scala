@@ -77,27 +77,23 @@ object ClusterConfig {
     }
   }
 
-  def validateJmxUser(jmxUser: String) { }
-  def validateJmxPass(jmxPass: String) { }
-
   def validateZkHosts(zkHosts: String): Unit = {
     require(zkHosts.length > 0, "cluster zk hosts is illegal, can't be empty!")
   }
 
-  def apply(name: String, version : String, zkHosts: String, zkMaxRetry: Int = 100, jmxEnabled: Boolean, jmxUser: String = "", jmxPass: String = "") : ClusterConfig = {
+  def apply(name: String, version : String, zkHosts: String, zkMaxRetry: Int = 100, jmxEnabled: Boolean, jmxUser: Option[String] = Some(""), jmxPass: Option[String] = Some("")) : ClusterConfig = {
     val kafkaVersion = KafkaVersion(version)
     //validate cluster name
     validateName(name)
     //validate zk hosts
     validateZkHosts(zkHosts)
     //validate and convert type
-    validateJmxUser(jmxUser)
-    validateJmxPass(jmxPass)
+
     val cleanZkHosts = zkHosts.replaceAll(" ","")
     new ClusterConfig(name, CuratorConfig(cleanZkHosts, zkMaxRetry), true, kafkaVersion, jmxEnabled, jmxUser, jmxPass)
   }
 
-  def customUnapply(cc: ClusterConfig) : Option[(String, String, String, Int, Boolean, String, String)] = {
+  def customUnapply(cc: ClusterConfig) : Option[(String, String, String, Int, Boolean, Option[String], Option[String])] = {
     Some((cc.name, cc.version.toString, cc.curatorConfig.zkConnect, cc.curatorConfig.zkMaxRetry, cc.jmxEnabled, cc.jmxUser, cc.jmxPass))
   }
 
@@ -139,13 +135,16 @@ object ClusterConfig {
     Try {
       val json = parse(kafka.manager.utils.deserializeString(ba))
 
-      val result = (field[String]("name")(json) |@| field[CuratorConfig]("curatorConfig")(json) |@| field[Boolean]("enabled")(json) |@| field[String]("jmxUser")(json) |@| field[String]("jmxPass")(json))
+      val result = (field[String]("name")(json) |@| field[CuratorConfig]("curatorConfig")(json) |@| field[Boolean]("enabled")(json)
+       |@| field[Option[String]]("jmxUser")(json) |@| field[Option[String]]("jmxPass")(json))
       {
-        (name:String,curatorConfig:CuratorConfig,enabled:Boolean,jmxUser:String,jmxPass:String) =>
+        (name:String,curatorConfig:CuratorConfig,enabled:Boolean,jmxUser:Option[String],jmxPass:Option[String]) =>
           val versionString = field[String]("kafkaVersion")(json)
           val version = versionString.map(KafkaVersion.apply).getOrElse(Kafka_0_8_1_1)
           val jmxEnabled = field[Boolean]("jmxEnabled")(json)
-          ClusterConfig.apply(name,curatorConfig,enabled,version,jmxEnabled.getOrElse(false), jmxUser, jmxPass)
+          val jmxUser = field[Option[String]]("jmxUser")(json)
+          val jmxPass = field[Option[String]]("jmxPass")(json)
+          ClusterConfig.apply(name,curatorConfig,enabled,version,jmxEnabled.getOrElse(false), jmxUser.getOrElse(Some("")), jmxPass.getOrElse(Some("")))
       }
 
       result match {
@@ -160,7 +159,7 @@ object ClusterConfig {
 
 }
 
-case class ClusterConfig (name: String, curatorConfig : CuratorConfig, enabled: Boolean, version: KafkaVersion, jmxEnabled: Boolean, jmxUser: String, jmxPass: String)
+case class ClusterConfig (name: String, curatorConfig : CuratorConfig, enabled: Boolean, version: KafkaVersion, jmxEnabled: Boolean, jmxUser: Option[String], jmxPass: Option[String])
 
 object KafkaManagerActor {
   val ZkRoot : String = "/kafka-manager"
